@@ -14,7 +14,8 @@
 }
 
 * { box-sizing: border-box; }
-html { scrollbar-gutter: stable; }
+body { overflow-x: clip; }
+@media (min-width: 1061px) { html { scrollbar-gutter: stable; } }
 body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 #app { padding: 40px 24px 80px; }
 p { margin: 0; }
@@ -84,9 +85,9 @@ button { font: inherit; }
 .wedge.on { opacity: 1 !important; }
 .load-arc { transition: d .25s ease; }
 .scale { font-family: var(--sans); paint-order: stroke; stroke: rgba(247,243,234,.8); stroke-width: 4px; stroke-linejoin: round; }
-.scale-0 { font-size: 17px; font-weight: 700; fill: var(--ink); }
-.scale-1 { font-size: 15px; font-weight: 500; fill: var(--muted); }
-.scale-2 { font-size: 14px; fill: #9A9285; }
+.scale-0 { font-size: calc(17px * var(--label-k, 1)); font-weight: 700; fill: var(--ink); }
+.scale-1 { font-size: calc(15px * var(--label-k, 1)); font-weight: 500; fill: var(--muted); }
+.scale-2 { font-size: calc(14px * var(--label-k, 1)); fill: #9A9285; }
 
 /* instructions above the map */
 .map-top { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 8px; min-height: 52px; }
@@ -106,7 +107,7 @@ button { font: inherit; }
 /* jagged dots nearer the centre (clip-path set from app.js) */
 .pt.hot .dot, .pt.warm .dot { border: none; border-radius: 0; box-shadow: none; }
 .sel-ring { position: absolute; border: 1.5px solid; border-radius: 50%; pointer-events: none; }
-.area-label { font-family: var(--serif); font-size: 21px; text-anchor: middle; dominant-baseline: middle; transition: font-size .15s; }
+.area-label { font-family: var(--serif); font-size: calc(21px * var(--label-k, 1)); text-anchor: middle; dominant-baseline: middle; transition: font-size .15s; }
 .area-label.on { text-decoration: underline; text-underline-offset: 4px; }
 
 .points { position: absolute; inset: 0; }
@@ -249,6 +250,8 @@ button { font: inherit; }
 .foot-left .saved-note { margin: 0; }
 .foot-left .link { font-size: 15px; }
 .btn:disabled { background: #B3AB9E; cursor: not-allowed; }
+.btn.secondary { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.btn.secondary:hover { background: rgba(46,42,38,.06); }
 
 /* step bar in the header */
 .stepper { display: flex; align-items: center; gap: 6px; margin-left: 28px; }
@@ -278,7 +281,16 @@ button { font: inherit; }
   .card { border: none; }
   .split { padding: 12px 0 32px; }
   .map-top { flex-direction: column; align-items: stretch; gap: 10px; padding: 0 16px; }
-  .zone-now { display: block; min-height: 96px; padding: 10px 12px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 4px; }
+  /* bigger text on the scaled-down map, and labels that wrap instead of running across zones */
+  .map { --label-k: max(1, calc(var(--inv, 1) * 0.68)); }
+  /* the two side labels run vertically along their arcs so they fit the narrow screen */
+  .area-label.side-l, .area-label.side-r { transform-box: fill-box; transform-origin: center; }
+  .area-label.side-l { transform: rotate(-90deg); }
+  .area-label.side-r { transform: rotate(90deg); }
+  .pt .lab { white-space: normal; width: max-content; max-width: calc(120px * var(--label-k, 1)); line-height: 1.1; }
+  .pt .lab.l { text-align: right; }
+  /* fixed height so changing text never moves the map under your finger */
+  .zone-now { display: block; height: 124px; overflow: hidden; padding: 10px 12px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 4px; }
   .area-list { display: none; }
   #side, .map-foot { padding: 0 16px; }
   .bar { padding: 14px 20px; }
@@ -295,6 +307,14 @@ button { font: inherit; }
   .stepper { margin-left: 12px; }
 }
 @media (max-width: 600px) {
+  .bar { padding: 12px 14px; gap: 8px; }
+  .brand { font-size: 17px; }
+  .stepper { margin-left: 4px; gap: 2px; }
+  .step-link { padding: 4px 5px; }
+  .step-sep { width: 8px; }
+  .storage { padding-left: 8px; }
+  .storage-label { display: none; }
+  .page-foot .btn { padding: 12px 18px; font-size: 16px; }
   .areas { grid-template-columns: 1fr; }
   .storage { font-size: 14px; }
 }
