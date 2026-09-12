@@ -606,11 +606,6 @@ function localPoint(map, e) {
   return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
 }
 
-// How far (in map units) to hold a dragged item above a fingertip: about 60px on screen.
-function fingerLift(map, e) {
-  return e.pointerType === 'touch' ? 60 * W / map.getBoundingClientRect().width : 0;
-}
-
 // Keep receiving a finger or mouse after it leaves the element; never let a refusal break the gesture.
 function capture(el, id) { try { el.setPointerCapture(id); } catch {} }
 
@@ -622,22 +617,18 @@ function wireMap(map) {
     if (pt) {
       e.preventDefault();
       const it = byId(+pt.dataset.id);
-      // On touch, lift the item above the fingertip while dragging so it stays visible.
-      S.press = { id: it.id, sx: p.x, sy: p.y, ox: it.x, oy: it.y, lift: fingerLift(map, e), touch: e.pointerType === 'touch' };
+      S.press = { id: it.id, sx: p.x, sy: p.y, ox: it.x, oy: it.y, touch: e.pointerType === 'touch' };
       capture(map, e.pointerId);
       return;
     }
     if (geom(p.x, p.y).r > EDGE) { if (S.selected) closeDetail(); return; }
     e.preventDefault();
     dropEmptySelection();
-    // On touch the new item appears just above the fingertip (unless that would put it outside the circle).
-    let lift = fingerLift(map, e);
-    if (geom(p.x, p.y - lift).r > EDGE) lift = 0;
-    const it = { id: S.nextId++, name: '', note: '', x: p.x, y: p.y - lift, eased: false, reflect: {} };
+    const it = { id: S.nextId++, name: '', note: '', x: p.x, y: p.y, eased: false, reflect: {} };
     S.items.push(it);
     selectItem(it.id, !compact());
     // Keep the finger (or mouse) on it: moving before letting go drags the new item into place.
-    S.press = { id: it.id, sx: p.x, sy: p.y, ox: it.x, oy: it.y, lift: 0, touch: e.pointerType === 'touch' };
+    S.press = { id: it.id, sx: p.x, sy: p.y, ox: it.x, oy: it.y, touch: e.pointerType === 'touch' };
     capture(map, e.pointerId);
   });
 
@@ -650,8 +641,9 @@ function wireMap(map) {
         map.classList.add('grabbing');
       }
       const it = byId(S.drag.id);
-      it.x = Math.max(-30, Math.min(W + 30, S.press.ox + p.x - S.press.sx));
-      it.y = Math.max(-30, Math.min(H + 30, S.press.oy + p.y - S.press.sy - (S.press.lift || 0)));
+      // The item sits exactly under the pointer (not offset by where on the dot you first pressed).
+      it.x = Math.max(-30, Math.min(W + 30, p.x));
+      it.y = Math.max(-30, Math.min(H + 30, p.y));
       const g = geom(it.x, it.y);
       highlight(map, g.r > EDGE ? null : g.area);
       renderPoints(map);
@@ -707,7 +699,7 @@ function renderDragOverlay(map) {
   $('.overlay', map).innerHTML = `
     <div class="from-ghost" style="left:${S.drag.fromX}px;top:${S.drag.fromY}px;border-color:${color}"></div>
     <div class="trail" style="left:${S.drag.fromX}px;top:${S.drag.fromY}px;width:${len}px;transform:rotate(${ang}deg);border-color:${color}"></div>
-    ${S.drag.touch ? '' : `<div class="move-card" style="left:${cardLeft}px;top:${cardTop}px;border-color:${color}">
+    ${S.drag.touch ? `<div class="touch-ring" style="left:${it.x}px;top:${it.y}px;border-color:${color};background:${outside ? 'rgba(122,115,106,.12)' : `rgba(${a.rgb},.16)`}"></div>` : `<div class="move-card" style="left:${cardLeft}px;top:${cardTop}px;border-color:${color}">
       <div class="now" style="color:${color}">${now}</div>
     </div>`}`;
 }
