@@ -67,7 +67,7 @@ button { font: inherit; }
 #side { padding-top: 0; }
 
 .map-wrap { width: 100%; max-width: 900px; margin: 0 auto; position: relative; }
-.map { position: absolute; left: 0; top: 0; width: 900px; height: 720px; transform-origin: 0 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.map { position: absolute; left: 0; top: 0; width: 900px; height: 720px; transform-origin: 0 0; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; }
 .map.interactive { cursor: crosshair; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 /* finger-sized touch target around each dot, constant on screen whatever the map's scale */
 .pt .hit { display: none; position: absolute; border-radius: 50%; width: calc(36px * var(--inv, 1)); height: calc(36px * var(--inv, 1)); left: calc(-18px * var(--inv, 1)); top: calc(-18px * var(--inv, 1)); }
@@ -123,6 +123,12 @@ button { font: inherit; }
 .pt.lifted .dot { box-shadow: 0 4px 14px rgba(46,42,38,.28); }
 
 .overlay { position: absolute; inset: 0; pointer-events: none; }
+/* only the circle (and the dots) capture touches; swiping anywhere else scrolls the page */
+.surface { position: absolute; border-radius: 50%; touch-action: none; }
+.pt { touch-action: none; }
+/* pale edge that follows a jagged dot's outline, like the white border on calm dots */
+.pt .halo { position: absolute; background: var(--paper); }
+.step-h.static { cursor: default; }
 /* while dragging with a finger: a ring wider than a fingertip, centred on the item, so its edge shows around the finger */
 .touch-ring { position: absolute; width: calc(84px * var(--inv, 1)); height: calc(84px * var(--inv, 1)); transform: translate(-50%, -50%); border: calc(2.5px * var(--inv, 1)) solid; border-radius: 50%; }
 .from-ghost { position: absolute; width: 22px; height: 22px; transform: translate(-50%, -50%); border: 1.5px dashed; border-radius: 50%; opacity: .6; }
@@ -303,6 +309,10 @@ button { font: inherit; }
 @media (max-width: 860px) {
   .step-label { display: none; }
   .stepper { margin-left: 12px; }
+}
+@media (min-width: 600px) and (max-width: 1060px) {
+  /* wider touchscreens (e.g. iPad mini): descriptions fit in fewer lines */
+  .zone-now { height: 92px; }
 }
 @media (max-width: 600px) {
   .bar { padding: 12px 14px; gap: 8px; }

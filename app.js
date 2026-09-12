@@ -262,7 +262,12 @@ if (!REDUCED_MOTION) {
   const frame = now => {
     const t = now / 1000;
     for (const d of $$('.pt .dot')) {
-      if (d.dataset.band !== 'calm') d.style.clipPath = jagged(d.dataset.band, +d.dataset.seed, t, +d.dataset.close);
+      if (d.dataset.band !== 'calm') {
+        const poly = jagged(d.dataset.band, +d.dataset.seed, t, +d.dataset.close);
+        d.style.clipPath = poly;
+        const halo = d.previousElementSibling;
+        if (halo && halo.classList.contains('halo')) halo.style.clipPath = poly;
+      }
       // Colour throb: barely there at the edge, deep and quick at the centre.
       const w = +d.dataset.w, depth = 0.04 + 0.4 * w * w, hz = 0.35 + 2.4 * w;
       const beat = 0.5 + 0.5 * Math.sin(t * hz * Math.PI * 2 + +d.dataset.seed);
@@ -317,6 +322,12 @@ function areaLoad() {
   return load;
 }
 
+// Mirrors the CSS --label-k: map text is scaled up on small screens so it stays readable.
+function labelK(svg) {
+  const inv = parseFloat(svg.closest('.map')?.style.getPropertyValue('--inv')) || 1;
+  return matchMedia('(max-width: 1060px)').matches ? Math.max(1, inv * 0.68) : 1;
+}
+
 // Make the areas carrying the most stand out: a thicker arc outside the circle,
 // stronger shading and a larger label. Areas with nothing in them fade back.
 function updateLoad(el) {
@@ -334,8 +345,20 @@ function updateLoad(el) {
     $(`.load-arc[data-area="${a.key}"]`, svg).setAttribute('d', rel ? segment(i, EDGE + 5, EDGE + 5 + 3 + 15 * rel, 1.5) : '');
     const lab = $(`.area-label[data-area="${a.key}"]`, svg);
     if (lab) {
-      lab.style.fontSize = max ? `calc(${Math.round(18 + 9 * rel)}px * var(--label-k, 1))` : '';
+      const base = max ? Math.round(18 + 9 * rel) : 21;
+      lab.style.fontSize = max ? `calc(${base}px * var(--label-k, 1))` : '';
       lab.style.fontWeight = !max ? '' : rel > 0.99 ? 700 : rel > 0.4 ? 600 : 400;
+      // Diagonal labels move outwards until their nearest corner clears the arc, using the label's
+      // real size: at a diagonal a wide word's inner corner reaches in towards the circle.
+      if (i !== 1 && i !== 4) {
+        const ang = (i * 60 + 30) * Math.PI / 180;
+        let hw = 0, hh = 0;
+        try { const b = lab.getBBox(); hw = b.width / 2; hh = b.height / 2; } catch {}
+        if (!hw) { hh = 0.6 * base * labelK(svg); hw = hh * a.key.length * 0.45; }
+        const arcOuter = EDGE + 5 + 3 + 15 * rel;
+        const [x, y] = polar(i * 60 + 30, arcOuter + 12 + hw * Math.abs(Math.sin(ang)) + hh * Math.abs(Math.cos(ang)));
+        lab.setAttribute('x', x); lab.setAttribute('y', y);
+      }
     }
   });
 }
@@ -354,6 +377,7 @@ function fit(wrap) {
   map.style.transform = `scale(${s})`;
   map.style.setProperty('--inv', (1 / s).toFixed(3));
   wrap.style.height = H * s + 'px';
+  updateLoad(map);
 }
 const fitObserver = new ResizeObserver(entries => { for (const e of entries) fit(e.target); });
 // Phones and narrow windows: the item panel sits below the map, so don't jump the keyboard up.
@@ -368,6 +392,9 @@ function renderPoints(el) {
     const close = band === 'hot' ? 1 - r / R1 : band === 'warm' ? (R2 - r) / (R2 - R1) : 0;
     // Jagged dots are drawn a little larger so the spikes do not shrink them.
     const ds = Math.round(s * (band === 'hot' ? 1.3 : band === 'warm' ? 1.08 : 1));
+    const poly = band === 'calm' ? '' : jagged(band, it.id, performance.now() / 1000, close);
+    // While dragging with a finger, the label moves above the ring so the finger doesn't cover it.
+    const upLabel = it.id === dragId && S.drag.touch;
     const cls = ['pt', band, it.id === S.selected ? 'selected' : '', it.id === dragId ? 'lifted' : '', dragId && it.id !== dragId ? 'dim' : ''].join(' ');
     const label = it.name || (it.id === S.selected ? 'new' : '');
     // Labels get larger, darker and heavier the more something bothers you.
@@ -376,8 +403,9 @@ function renderPoints(el) {
     return `<div class="${cls}" data-id="${it.id}" style="left:${it.x}px;top:${it.y}px" tabindex="0" role="button" aria-label="${esc(label)}, ${a.key}, bothers you ${severity(r)}">
       ${it.id === S.selected ? `<div class="sel-ring" style="width:${s + 14}px;height:${s + 14}px;left:${-s / 2 - 7}px;top:${-s / 2 - 7}px;border-color:${a.color}"></div>` : ''}
       <div class="hit"></div>
-      <div class="dot" style="width:${ds}px;height:${ds}px;left:${-ds / 2}px;top:${-ds / 2}px;background:${a.color}${band === 'calm' ? '' : `;clip-path:${jagged(band, it.id, performance.now() / 1000, close)}`}" data-band="${band}" data-seed="${it.id}" data-close="${close.toFixed(3)}" data-w="${w.toFixed(3)}"></div>
-      ${label ? `<div class="lab${it.name ? '' : ' placeholder'}${left ? ' l' : ''}" style="${left ? `right:${s / 2 + 8}px` : `left:${s / 2 + 8}px`};${labStyle}">${esc(label)}</div>` : ''}
+      ${poly ? `<div class="halo" style="width:${ds + 7}px;height:${ds + 7}px;left:${-(ds + 7) / 2}px;top:${-(ds + 7) / 2}px;clip-path:${poly}"></div>` : ''}
+      <div class="dot" style="width:${ds}px;height:${ds}px;left:${-ds / 2}px;top:${-ds / 2}px;background:${a.color}${poly ? `;clip-path:${poly}` : ''}" data-band="${band}" data-seed="${it.id}" data-close="${close.toFixed(3)}" data-w="${w.toFixed(3)}"></div>
+      ${label ? `<div class="lab${it.name ? '' : ' placeholder'}${left ? ' l' : ''}" style="${left ? `right:${s / 2 + 8}px` : `left:${s / 2 + 8}px`};${labStyle}${upLabel ? ';left:0;right:auto;top:calc(-50px * var(--inv, 1));transform:translate(-50%,-100%);text-align:center;font-weight:600' : ''}">${esc(label)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -389,6 +417,7 @@ function renderMapScreen() {
       <div class="map-top" id="map-top"></div>
       <div class="map-wrap" id="map-wrap"><div class="map interactive" id="map">
         ${mapSvg('m')}
+        <div class="surface" style="left:${CX - EDGE}px;top:${CY - EDGE}px;width:${EDGE * 2}px;height:${EDGE * 2}px"></div>
         <div class="points"></div>
         <div class="overlay"></div>
       </div></div>
@@ -500,12 +529,20 @@ function renderDetail(side, it) {
   const thought = (r.thought || '').trim();
 
   // One step open at a time, so the panel stays about as tall as the map.
-  const open = S.openStep ?? (!thought ? 1 : !checked ? 2 : 3);
-  const next = n => `<button class="link next-step" data-step="${n}">next</button>`;
-  const step = (n, title, summary, body, long = false) => `
-    <section class="step${open === n ? ' open' : ''}">
-      <button class="step-h${long ? ' long' : ''}" data-step="${n}" aria-expanded="${open === n}"><span class="n">${n}</span><span class="title">${title}${long && open !== n && summary ? `<span class="sum">${esc(summary)}</span>` : ''}</span>${!long && open !== n && summary ? `<span class="sum">${esc(summary)}</span>` : ''}</button>
-      ${open === n ? `<div class="step-body">${body}</div>` : ''}
+  // On wide, non-touch screens one step is open at a time so the panel stays beside the map.
+  // On phones and tablets the form is below the map anyway, so every step is shown open.
+  const accordion = !compact();
+  const open = accordion ? (S.openStep ?? (!thought ? 1 : !checked ? 2 : 3)) : 0;
+  const isOpen = n => !accordion || open === n;
+  const next = n => accordion ? `<button class="link next-step" data-step="${n}">next</button>` : '';
+  const step = (n, title, summary, body, long = false) => !accordion ? `
+    <section class="step open">
+      <div class="step-h static${long ? ' long' : ''}"><span class="n">${n}</span><span class="title">${title}</span></div>
+      <div class="step-body">${body}</div>
+    </section>` : `
+    <section class="step${isOpen(n) ? ' open' : ''}">
+      <button class="step-h${long ? ' long' : ''}" data-step="${n}" aria-expanded="${isOpen(n)}"><span class="n">${n}</span><span class="title">${title}${long && !isOpen(n) && summary ? `<span class="sum">${esc(summary)}</span>` : ''}</span>${!long && !isOpen(n) && summary ? `<span class="sum">${esc(summary)}</span>` : ''}</button>
+      ${isOpen(n) ? `<div class="step-body">${body}</div>` : ''}
     </section>`;
   const controlLabel = (CONTROL.find(([v]) => v === r.control) || [])[1];
 
@@ -629,7 +666,8 @@ function wireMap(map) {
       capture(map, e.pointerId);
       return;
     }
-    if (geom(p.x, p.y).r > EDGE) { if (S.selected) closeDetail(); return; }
+    // Outside the circle: a mouse click closes the open item, but a touch is left alone (it's a scroll).
+    if (geom(p.x, p.y).r > EDGE) { if (S.selected && e.pointerType !== 'touch') closeDetail(); return; }
     e.preventDefault();
     dropEmptySelection();
     const it = { id: S.nextId++, name: '', note: '', x: p.x, y: p.y, eased: false, reflect: {} };
@@ -799,6 +837,9 @@ function renderPlan() {
   $('#to-map').onclick = () => go('map');
   for (const b of $$('.plan-name, .decide')) b.onclick = () => go('map', { select: +b.dataset.id });
 }
+
+// Label positions depend on measured text size, so re-place them once the web fonts have loaded.
+document.fonts?.ready.then(() => { for (const m of $$('.map, .mini')) updateLoad(m); });
 
 // Redraw when the window crosses between the small-screen and desktop layouts (side labels differ).
 matchMedia('(max-width: 1060px), (pointer: coarse)').addEventListener('change', () => { if (S.screen !== 'intro') render(); });
