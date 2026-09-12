@@ -209,13 +209,11 @@ button { font: inherit; }
 .verdict.letgo { background: rgba(90,83,120,.13); color: #4A4466; }
 
 /* ---------- plan ---------- */
-.pad { padding: 64px 48px 72px; }
-.take-top { display: grid; grid-template-columns: 1fr 240px; gap: 64px; align-items: start; margin-bottom: 44px; }
+.pad { padding: 36px 48px 52px; }
+.take-top { max-width: 760px; margin-bottom: 40px; }
 .take-top .big { font-family: var(--serif); font-size: 34px; line-height: 1.25; margin-bottom: 14px; }
 .take-top .copy { font-size: 18px; max-width: 700px; }
 .take-top .copy + .copy { margin-top: 12px; }
-.mini { position: relative; width: 240px; height: 192px; }
-.mini .map-svg { position: static; }
 
 .band { margin-bottom: 40px; padding: 24px 28px 8px; border-radius: 6px; }
 .band-0 { background: rgba(46,42,38,.07); }
@@ -298,8 +296,10 @@ button { font: inherit; }
   .area-list { display: none; }
   #side, .map-foot { padding: 0 16px; }
   .bar { padding: 14px 20px; }
-  .intro, .pad { padding: 40px 24px; }
-  .take-top { grid-template-columns: 1fr; gap: 32px; }
+  .intro { padding: 32px 16px 40px; }
+  .pad { padding: 16px 16px 40px; }
+  /* on small screens the instruction lives in the area box */
+  .instr { display: none; }
   .areas { grid-template-columns: 1fr 1fr; }
   .area-cell, .area-cell:nth-child(n) { padding: 22px 16px; border-right: none; border-bottom: 1px solid var(--line-2); }
   .split, .split.wide-side { grid-template-columns: 1fr; gap: 12px; }
@@ -328,8 +328,12 @@ button { font: inherit; }
 }
 
 @media print {
-  body { background: #fff; }
+  body, .card { background: #fff; }
   #app { padding: 0; }
-  .card { border: none; }
-  .actions, .storage { display: none; }
+  .card { border: none; max-width: none; }
+  /* navigation, buttons and links aren't useful on paper */
+  .stepper, .storage, .page-foot, .actions, .decide, #undo-bar { display: none !important; }
+  .band, .band-0, .band-1, .band-2 { background: none; padding-left: 0; padding-right: 0; }
+  .card-item { break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .plan-name { pointer-events: none; }
 }

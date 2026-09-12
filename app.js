@@ -324,7 +324,8 @@ function areaLoad() {
 
 // Mirrors the CSS --label-k: map text is scaled up on small screens so it stays readable.
 function labelK(svg) {
-  const inv = parseFloat(svg.closest('.map')?.style.getPropertyValue('--inv')) || 1;
+  const raw = parseFloat(svg.closest('.map')?.style.getPropertyValue('--inv'));
+  const inv = Number.isFinite(raw) && raw > 0 ? raw : 1;
   return matchMedia('(max-width: 1060px)').matches ? Math.max(1, inv * 0.68) : 1;
 }
 
@@ -372,6 +373,8 @@ function highlight(el, key) {
 
 // Scale the fixed-size map down to fit narrow containers.
 function fit(wrap) {
+  // A map that has just been removed (or isn't laid out yet) measures 0 wide; skip it.
+  if (!wrap.isConnected || !wrap.clientWidth) return;
   const map = wrap.firstElementChild;
   const s = Math.min(1, wrap.clientWidth / W);
   map.style.transform = `scale(${s})`;
@@ -436,7 +439,7 @@ function renderTop() {
   const top = $('#map-top');
   if (!top) return;
   top.innerHTML = `
-    <p class="instr"><b>${matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click'} in the circle to add something that is bothering you.</b> Put it in the area it belongs to — the closer to the centre, the more it bothers you.</p>
+    <p class="instr">${INSTRUCTION()}</p>
     <div class="zone-now" id="zone-now"></div>`;
   updateZoneNow();
   const foot = $('#map-foot');
@@ -470,7 +473,10 @@ function renderSide() {
   }
 }
 
-// Small screens: above the map, describe only the area the selected (or dragged) item is in.
+const INSTRUCTION = () => `${matchMedia('(pointer: coarse)').matches ? 'Tap and drag' : 'Click and drag'} in the circle to place something that’s bothering you. Nearer the centre means it bothers you more.`;
+
+// Small screens: above the map, describe only the area the selected (or dragged) item is in,
+// or the instruction until something is selected.
 function updateZoneNow() {
   const box = $('#zone-now');
   if (!box) return;
@@ -478,7 +484,7 @@ function updateZoneNow() {
   const g = it && geom(it.x, it.y);
   if (!it || g.r > EDGE) {
     box.removeAttribute('style');
-    box.innerHTML = '<p class="zone-empty">Tap something on the map to see which area it is in.</p>';
+    box.innerHTML = `<p class="zone-empty">${INSTRUCTION()}</p>`;
     return;
   }
   const a = AREA[g.area];
@@ -556,7 +562,7 @@ function renderDetail(side, it) {
         ${area('thought', 'e.g. nobody here notices anything I do')}
         ${next(2)}`)}
 
-      ${step(2, 'Strong feelings are real, but they are not always an accurate reading. A quick check helps separate the two.', checked ? (doubts ? 'not entirely balanced' : 'seems balanced') : '', `
+      ${step(2, 'A strong feeling is real, but it isn’t always an accurate read of the situation.', checked ? (doubts ? 'not entirely balanced' : 'seems balanced') : '', `
         ${CHECKS.map(c => `<div class="check"><p class="q">${c.q}</p>${chips(c.k, [['yes', 'Yes'], ['partly', 'Partly'], ['no', 'No']])}</div>`).join('')}
         ${doubts ? `
           <label class="sub">A more balanced way to put it</label>
@@ -655,6 +661,9 @@ function localPoint(map, e) {
 function capture(el, id) { try { el.setPointerCapture(id); } catch {} }
 
 function wireMap(map) {
+  // Belt and braces for Safari: touch-action alone doesn't always stop a drag that leaves the circle
+  // from turning into a scroll, so block scrolling for the rest of any drag that began on the circle.
+  map.addEventListener('touchmove', e => { if (S.press || S.drag) e.preventDefault(); }, { passive: false });
   map.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     const p = localPoint(map, e);
@@ -816,7 +825,6 @@ function renderPlan() {
           <p class="copy">When you're burnt out, it can be hard to say exactly what's wrong. It often just feels like everything. Listing the specific things makes it easier to tell which ones you can change and which you can't.</p>
           <p class="copy">For the things you can change, start with one small, specific step. For the things you can't, it helps to check whether the way you're thinking about them is accurate and fair. Studies have found that this kind of reflection can reduce the exhaustion and cynicism that come with burnout, even when the situation itself stays the same.</p>
         </div>
-        <div class="mini">${mapSvg('t', { labels: false, dots: true })}</div>
       </div>
       ${bands.map(b => `
         <section class="band band-${b.i}">
@@ -831,7 +839,6 @@ function renderPlan() {
       ${pageFoot('<button class="btn" id="print">Print or save as PDF</button>',
         '<button class="btn secondary" id="to-map">Back: map it out</button><p class="saved-note">Everything here stays saved in this browser until you clear it.</p><button class="link" id="clear-plan">clear everything</button>')}
     </div>`, today);
-  updateLoad($('.mini'));
   $('#print').onclick = () => window.print();
   $('#clear-plan').onclick = clearAll;
   $('#to-map').onclick = () => go('map');
@@ -839,7 +846,7 @@ function renderPlan() {
 }
 
 // Label positions depend on measured text size, so re-place them once the web fonts have loaded.
-document.fonts?.ready.then(() => { for (const m of $$('.map, .mini')) updateLoad(m); });
+document.fonts?.ready.then(() => { for (const m of $$('.map')) updateLoad(m); });
 
 // Redraw when the window crosses between the small-screen and desktop layouts (side labels differ).
 matchMedia('(max-width: 1060px), (pointer: coarse)').addEventListener('change', () => { if (S.screen !== 'intro') render(); });
