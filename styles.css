@@ -14,6 +14,7 @@
 }
 
 * { box-sizing: border-box; }
+html { scrollbar-gutter: stable; }
 body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 #app { padding: 40px 24px 80px; }
 p { margin: 0; }
@@ -66,7 +67,17 @@ button { font: inherit; }
 
 .map-wrap { width: 100%; max-width: 900px; margin: 0 auto; position: relative; }
 .map { position: absolute; left: 0; top: 0; width: 900px; height: 720px; transform-origin: 0 0; touch-action: none; user-select: none; -webkit-user-select: none; }
-.map.interactive { cursor: crosshair; }
+.map.interactive { cursor: crosshair; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+/* finger-sized touch target around each dot, constant on screen whatever the map's scale */
+.pt .hit { display: none; position: absolute; border-radius: 50%; width: calc(44px * var(--inv, 1)); height: calc(44px * var(--inv, 1)); left: calc(-22px * var(--inv, 1)); top: calc(-22px * var(--inv, 1)); }
+@media (pointer: coarse) { .pt .hit { display: block; } }
+
+/* single-area description above the map (small screens only) */
+.zone-now { display: none; }
+.zone-name { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; }
+.zone-name span { font-weight: 400; color: var(--faint); font-size: 15px; }
+.zone-meaning { margin-top: 3px; font-size: 15px; line-height: 1.45; color: var(--body); }
+.zone-empty { font-size: 15px; line-height: 1.45; color: var(--faint); }
 .map.grabbing { cursor: grabbing; }
 .map-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .wedge { opacity: .88; transition: opacity .2s ease, fill-opacity .25s ease; }
@@ -263,13 +274,19 @@ button { font: inherit; }
 
 /* ---------- narrow screens ---------- */
 @media (max-width: 1060px) {
-  #app { padding: 16px 12px 48px; }
+  #app { padding: 0 0 48px; }
+  .card { border: none; }
+  .split { padding: 12px 0 32px; }
+  .map-top { flex-direction: column; align-items: stretch; gap: 10px; padding: 0 16px; }
+  .zone-now { display: block; min-height: 96px; padding: 10px 12px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 4px; }
+  .area-list { display: none; }
+  #side, .map-foot { padding: 0 16px; }
   .bar { padding: 14px 20px; }
   .intro, .pad { padding: 40px 24px; }
   .take-top { grid-template-columns: 1fr; gap: 32px; }
   .areas { grid-template-columns: 1fr 1fr; }
   .area-cell, .area-cell:nth-child(n) { padding: 22px 16px; border-right: none; border-bottom: 1px solid var(--line-2); }
-  .split, .split.wide-side { grid-template-columns: 1fr; padding: 24px 16px 40px; gap: 12px; }
+  .split, .split.wide-side { grid-template-columns: 1fr; gap: 12px; }
   .side { padding-top: 0; }
   .band { padding: 18px 14px 4px; }
 }

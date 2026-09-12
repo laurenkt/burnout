@@ -340,14 +340,16 @@ function highlight(el, key) {
 }
 
 // Scale the fixed-size map down to fit narrow containers.
-const fitObserver = new ResizeObserver(entries => {
-  for (const e of entries) {
-    const wrap = e.target, map = wrap.firstElementChild;
-    const s = Math.min(1, wrap.clientWidth / W);
-    map.style.transform = `scale(${s})`;
-    wrap.style.height = H * s + 'px';
-  }
-});
+function fit(wrap) {
+  const map = wrap.firstElementChild;
+  const s = Math.min(1, wrap.clientWidth / W);
+  map.style.transform = `scale(${s})`;
+  map.style.setProperty('--inv', (1 / s).toFixed(3));
+  wrap.style.height = H * s + 'px';
+}
+const fitObserver = new ResizeObserver(entries => { for (const e of entries) fit(e.target); });
+// Phones and narrow windows: the item panel sits below the map, so don't jump the keyboard up.
+const compact = () => matchMedia('(max-width: 1060px), (pointer: coarse)').matches;
 
 function renderPoints(el) {
   updateLoad(el);
@@ -365,6 +367,7 @@ function renderPoints(el) {
     const labStyle = `font-size:${size}px;top:${-size * 0.7}px;font-weight:${w > 0.66 ? 600 : w > 0.33 ? 500 : 400};color:rgb(${shade},${shade - 4},${shade - 10})`;
     return `<div class="${cls}" data-id="${it.id}" style="left:${it.x}px;top:${it.y}px" tabindex="0" role="button" aria-label="${esc(label)}, ${a.key}, bothers you ${severity(r)}">
       ${it.id === S.selected ? `<div class="sel-ring" style="width:${s + 14}px;height:${s + 14}px;left:${-s / 2 - 7}px;top:${-s / 2 - 7}px;border-color:${a.color}"></div>` : ''}
+      <div class="hit"></div>
       <div class="dot" style="width:${ds}px;height:${ds}px;left:${-ds / 2}px;top:${-ds / 2}px;background:${a.color}${band === 'calm' ? '' : `;clip-path:${jagged(band, it.id, performance.now() / 1000, close)}`}" data-band="${band}" data-seed="${it.id}" data-close="${close.toFixed(3)}" data-w="${w.toFixed(3)}"></div>
       ${label ? `<div class="lab${it.name ? '' : ' placeholder'}" style="${left ? `right:${s / 2 + 8}px` : `left:${s / 2 + 8}px`};${labStyle}">${esc(label)}</div>` : ''}
     </div>`;
@@ -385,6 +388,7 @@ function renderMapScreen() {
       <div class="map-foot" id="map-foot"></div>
     </div>`);
   const map = $('#map');
+  fit(map.parentElement);
   fitObserver.observe(map.parentElement);
   renderPoints(map);
   renderSide();
@@ -395,7 +399,9 @@ function renderTop() {
   const top = $('#map-top');
   if (!top) return;
   top.innerHTML = `
-    <p class="instr"><b>Click in the circle to add something that is bothering you.</b> Put it in the area it belongs to — the closer to the centre, the more it bothers you.</p>`;
+    <p class="instr"><b>Click in the circle to add something that is bothering you.</b> Put it in the area it belongs to — the closer to the centre, the more it bothers you.</p>
+    <div class="zone-now" id="zone-now"></div>`;
+  updateZoneNow();
   const foot = $('#map-foot');
   if (foot) foot.innerHTML = pageFoot(onMap().length
     ? '<button class="btn" id="to-plan">Next: your plan</button>'
@@ -422,6 +428,22 @@ function renderSide() {
     li.onmouseenter = () => highlight(map, li.dataset.area);
     li.onmouseleave = () => highlight(map, null);
   }
+}
+
+// Small screens: above the map, describe only the area the selected (or dragged) item is in.
+function updateZoneNow() {
+  const box = $('#zone-now');
+  if (!box) return;
+  const it = byId(S.drag?.id) || (S.selected && byId(S.selected));
+  const g = it && geom(it.x, it.y);
+  if (!it || g.r > EDGE) {
+    box.removeAttribute('style');
+    box.innerHTML = '<p class="zone-empty">Tap something on the map to see which area it is in.</p>';
+    return;
+  }
+  const a = AREA[g.area];
+  box.style.cssText = `border-color:${a.color};background:rgba(${a.rgb},.08)`;
+  box.innerHTML = `<div class="zone-name" style="color:${a.color}">${blob(a, 12)}${a.key}<span>· bothers you ${severity(g.r)}</span></div><p class="zone-meaning">${a.meaning}</p>`;
 }
 
 // Highlight an area in the side-panel list (null clears it).
@@ -581,6 +603,9 @@ function localPoint(map, e) {
   return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
 }
 
+// Keep receiving a finger or mouse after it leaves the element; never let a refusal break the gesture.
+function capture(el, id) { try { el.setPointerCapture(id); } catch {} }
+
 function wireMap(map) {
   map.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
@@ -590,7 +615,7 @@ function wireMap(map) {
       e.preventDefault();
       const it = byId(+pt.dataset.id);
       S.press = { id: it.id, sx: p.x, sy: p.y, ox: it.x, oy: it.y };
-      map.setPointerCapture(e.pointerId);
+      capture(map, e.pointerId);
       return;
     }
     if (geom(p.x, p.y).r > EDGE) { if (S.selected) closeDetail(); return; }
@@ -598,7 +623,10 @@ function wireMap(map) {
     dropEmptySelection();
     const it = { id: S.nextId++, name: '', note: '', x: p.x, y: p.y, eased: false, reflect: {} };
     S.items.push(it);
-    selectItem(it.id, true);
+    selectItem(it.id, !compact());
+    // Keep the finger (or mouse) on it: moving before letting go drags the new item into place.
+    S.press = { id: it.id, sx: p.x, sy: p.y, ox: p.x, oy: p.y };
+    capture(map, e.pointerId);
   });
 
   map.addEventListener('pointermove', e => {
@@ -617,6 +645,7 @@ function wireMap(map) {
       renderPoints(map);
       renderDragOverlay(map);
       if (it.id === S.selected && $('#detail-head')) $('#detail-head').innerHTML = detailHead(it);
+      updateZoneNow();
       return;
     }
     const g = geom(p.x, p.y);
