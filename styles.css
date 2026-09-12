@@ -285,10 +285,6 @@ button { font: inherit; }
   .map-top { flex-direction: column; align-items: stretch; gap: 10px; padding: 0 16px; }
   /* bigger text on the scaled-down map, and labels that wrap instead of running across zones */
   .map { --label-k: max(1, calc(var(--inv, 1) * 0.68)); }
-  /* the two side labels run vertically along their arcs so they fit the narrow screen */
-  .area-label.side-l, .area-label.side-r { transform-box: fill-box; transform-origin: center; }
-  .area-label.side-l { transform: rotate(-90deg); }
-  .area-label.side-r { transform: rotate(90deg); }
   .pt .lab { white-space: normal; width: max-content; max-width: calc(120px * var(--label-k, 1)); line-height: 1.1; }
   .pt .lab.l { text-align: right; }
   /* fixed height so changing text never moves the map under your finger */

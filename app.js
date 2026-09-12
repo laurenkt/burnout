@@ -292,8 +292,16 @@ function mapSvg(id, { labels = true, dots = false } = {}) {
   const names = labels ? AREAS.map((a, i) => {
     const mid = i * 60 + 30;
     const side = mid === 90 ? 'start' : mid === 270 ? 'end' : '';
-    const [x, y] = side ? [CX + (side === 'start' ? 1 : -1) * (EDGE + 30), CY] : polar(mid, LABEL_R);
-    return `<text class="area-label${side ? (side === 'start' ? ' side-r' : ' side-l') : ''}" data-area="${a.key}" x="${x}" y="${y}" fill="${a.color}"${side ? ` style="text-anchor:${side}"` : ''}>${a.key}</text>`;
+    let [x, y] = side ? [CX + (side === 'start' ? 1 : -1) * (EDGE + 30), CY] : polar(mid, LABEL_R);
+    // On small screens the side labels run vertically along their arcs. This uses SVG's own
+    // rotate attribute: iOS Safari mis-places CSS transforms on SVG text.
+    const vertical = side && compact();
+    // Vertical labels sit a little further out so they clear the thickest load arc.
+    if (vertical) x = CX + (side === 'start' ? 1 : -1) * (EDGE + 60);
+    const attrs = vertical
+      ? ` transform="rotate(${side === 'start' ? 90 : -90} ${x} ${y})" style="text-anchor:middle"`
+      : side ? ` style="text-anchor:${side}"` : '';
+    return `<text class="area-label" data-area="${a.key}" x="${x}" y="${y}" fill="${a.color}"${attrs}>${a.key}</text>`;
   }).join('') : '';
   const pts = dots ? onMap().map(it => {
     const a = AREA[areaOf(it)];
@@ -791,6 +799,9 @@ function renderPlan() {
   $('#to-map').onclick = () => go('map');
   for (const b of $$('.plan-name, .decide')) b.onclick = () => go('map', { select: +b.dataset.id });
 }
+
+// Redraw when the window crosses between the small-screen and desktop layouts (side labels differ).
+matchMedia('(max-width: 1060px), (pointer: coarse)').addEventListener('change', () => { if (S.screen !== 'intro') render(); });
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && S.screen === 'map' && S.selected) closeDetail();
